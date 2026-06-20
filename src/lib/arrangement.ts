@@ -36,21 +36,25 @@ const INTRO_CLOSE = [
   /(excited (about|to|for)|looking (to|forward)|hope to)/,
   /(that'?s (why|what brings|what drew)|drawn to|keen to)/,
   /(which is why i|that'?s me|in a nutshell|so that'?s)/,
+  /(i'?m here because|i'?d love|i would love|that'?s where i|where i do my best)/,
+  /(help you|makes or breaks|compounds|do my best work)/,
 ]
 
-// Intro opens by establishing identity/role.
+// Intro opens by establishing identity/role — or a strong framing line.
 const INTRO_HOOK = [
   /^(i'?m |i am |my name)/,
   /^(i'?ve (spent|been|worked|built))/,
   /^(i'?m a |i'?m an )/,
   /^(currently i|right now i|these days)/,
   /^(for the (last|past) \w+ years)/,
+  /^(here'?s|let me give|let me)/,
+  /(short version|one[- ]sentence version|the headline)/,
 ]
 
 // Intro arc markers (present / past / future).
-const INTRO_PRESENT = /(currently|right now|these days|at the moment|i work|i'?m a|i lead|i'?m based)/
-const INTRO_PAST = /(before|previously|prior|i started|i grew|i studied|years ago|i used to|background)/
-const INTRO_FUTURE = /(looking|excited|hope|want to|next|goal|aiming|that'?s why|drawn to)/
+const INTRO_PRESENT = /(currently|right now|these days|at the moment|i work|i'?m a|i lead|i'?m based|i build|i help)/
+const INTRO_PAST = /(before|previously|prior|i started|started (out|in|as)|i grew|grew it|i studied|years ago|i used to|background|joined|launched|i built|i led|took over|i spent|i began|began as|i ran|moved into)/
+const INTRO_FUTURE = /(looking|excited|hope|want to|next|goal|aiming|that'?s why|drawn to|i'?d love|i would love|i'?m here because)/
 
 // Hedge endings that undercut a close.
 const HEDGE_END = /(i guess|or whatever|or something|i suppose|kind of)\s*\.?\s*$/
@@ -94,7 +98,9 @@ export function scoreArrangement(
   const w = words(text)
   const n = w.length
   const opening = w.slice(0, 12).join(' ')
-  const closing = w.slice(-18).join(' ')
+  // Closing window = last third (min 18 words) so a strong close one clause
+  // before the literal end still counts.
+  const closing = w.slice(-Math.max(18, Math.floor(n * 0.35))).join(' ')
   const intro = isIntro(prompt, situation)
 
   // --- Hook ---

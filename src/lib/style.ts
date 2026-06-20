@@ -1,4 +1,5 @@
 import type { StyleResult } from '../types'
+import { countFillers } from './fillers'
 
 // Style canon (Layer 3): language quality — concision, jargon, concreteness.
 // Deterministic, in-browser. Robust to unpunctuated speech transcripts.
@@ -79,12 +80,19 @@ export function scoreStyle(transcript: string): StyleResult {
     Math.min(100, Math.round(58 + Math.min(30, numbers * 9) - Math.min(45, vagueRate * 6))),
   )
 
+  // Filler/clutter density is also a clarity (style) problem, not just delivery.
+  // It folds into concision so word-salad answers stop floating on a free 100.
+  const fillerRate = (countFillers(text).count / n) * 100
+  const clutterPenalty = Math.min(60, fillerRate * 4)
+
   const sub = {
-    concision: concisionScore(avgLen),
+    concision: Math.max(8, Math.round(concisionScore(avgLen) - clutterPenalty)),
     jargon: jargonScore(jargonRate),
     concreteness,
   }
-  const score = Math.round(sub.concision * 0.34 + sub.jargon * 0.3 + sub.concreteness * 0.36)
+  // Concreteness weighted highest; jargon lowest (most answers have none, so it
+  // shouldn't hand out a free pass).
+  const score = Math.round(sub.concision * 0.35 + sub.jargon * 0.15 + sub.concreteness * 0.5)
 
   return {
     score,
