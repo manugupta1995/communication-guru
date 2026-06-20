@@ -14,12 +14,16 @@ export interface DeliveryMetrics {
   fillerCount: number
   fillerRate: number // fillers / words
   fillerWords: string[] // which ones, for evidence
+  fillerBreakdown: { label: string; n: number }[] // per-word counts
   pauseCount: number // silent gaps > 0.4s
-  vocalVariety: number // coefficient of variation of energy, 0..1+
+  vocalVariety: number // 0..1 composite (pitch + dynamics)
+  pitchVariation: number // semitone std-dev of F0
+  dynamicRange: number // p90/median of voiced energy
+  speakingRatio: number // voiced time / total
   score: number // 0..100
   subScores: {
     pace: number
-    fillers: number
+    fillers: number // fluency (fillers + hesitation)
     variety: number
   }
 }

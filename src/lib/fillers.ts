@@ -18,6 +18,7 @@ const FILLER_PATTERNS: { label: string; re: RegExp }[] = [
 export interface FillerResult {
   count: number
   words: string[] // distinct labels found, most frequent first
+  breakdown: { label: string; n: number }[] // per-word counts
 }
 
 export function countFillers(transcript: string): FillerResult {
@@ -30,10 +31,10 @@ export function countFillers(transcript: string): FillerResult {
       total += matches.length
     }
   }
-  const words = Object.entries(found)
+  const breakdown = Object.entries(found)
     .sort((a, b) => b[1] - a[1])
-    .map(([label]) => label)
-  return { count: total, words }
+    .map(([label, n]) => ({ label, n }))
+  return { count: total, words: breakdown.map((b) => b.label), breakdown }
 }
 
 export function wordCount(transcript: string): number {

@@ -175,6 +175,7 @@ export default function App() {
           question={question}
           status={rec.status}
           transcript={rec.transcript}
+          elapsed={rec.elapsed}
           error={rec.error}
           analyzing={analyzing}
           onStart={() => void rec.start()}
@@ -448,6 +449,7 @@ function RecordPanel({
   question,
   status,
   transcript,
+  elapsed,
   error,
   analyzing,
   onStart,
@@ -458,6 +460,7 @@ function RecordPanel({
   question: string
   status: string
   transcript: string
+  elapsed: number
   error: string | null
   analyzing: boolean
   onStart: () => void
@@ -465,6 +468,7 @@ function RecordPanel({
   onSample: () => void
   onBack: () => void
 }) {
+  const mmss = `${Math.floor(elapsed / 60)}:${String(elapsed % 60).padStart(2, '0')}`
   return (
     <Card>
       <button onClick={onBack} className="text-sm text-slate-400 mb-3">
@@ -504,12 +508,18 @@ function RecordPanel({
                 ■ Stop & analyze
               </button>
             )}
-            <button
-              onClick={onSample}
-              className="text-slate-600 font-medium rounded-lg px-4 py-3 border border-slate-200 hover:bg-slate-50"
-            >
-              Try a sample answer
-            </button>
+            {status === 'recording' ? (
+              <span className="font-mono text-red-500 font-bold tabular-nums">
+                ● {mmss}
+              </span>
+            ) : (
+              <button
+                onClick={onSample}
+                className="text-slate-600 font-medium rounded-lg px-4 py-3 border border-slate-200 hover:bg-slate-50"
+              >
+                Try a sample answer
+              </button>
+            )}
           </div>
 
           {error && <p className="text-sm text-red-500 mb-3">{error}</p>}
@@ -528,6 +538,11 @@ function RecordPanel({
               )}
             </p>
           </div>
+          <p className="text-xs text-slate-400 mt-2">
+            Tip: use Chrome or Edge for live transcription. Pitch, pace & energy
+            are measured from your actual audio; exact "um"/"uh" counts depend on
+            the browser transcriber.
+          </p>
         </>
       )}
     </Card>
@@ -540,13 +555,16 @@ function LayerScore({
   detail,
   focus,
   delta,
+  details,
 }: {
   name: string
   score: number
   detail: string
   focus: boolean
   delta?: number
+  details?: React.ReactNode
 }) {
+  const [open, setOpen] = useState(false)
   return (
     <div
       className={`rounded-xl border p-4 ${
@@ -573,6 +591,46 @@ function LayerScore({
         <div className={`h-full ${barColor(score)}`} style={{ width: `${score}%` }} />
       </div>
       <p className="text-xs text-slate-500 mt-2">{detail}</p>
+      {details && (
+        <>
+          <button
+            onClick={() => setOpen((o) => !o)}
+            className="text-xs font-semibold text-guru mt-2 hover:underline"
+          >
+            {open ? '▾ hide breakdown' : '▸ see breakdown'}
+          </button>
+          {open && <div className="mt-2 pt-2 border-t border-slate-100">{details}</div>}
+        </>
+      )}
+    </div>
+  )
+}
+
+function SubBar({ label, value }: { label: string; value: number }) {
+  return (
+    <div className="flex items-center gap-2 text-xs">
+      <span className="w-20 text-slate-500 shrink-0">{label}</span>
+      <div className="flex-1 h-1.5 rounded-full bg-slate-100 overflow-hidden">
+        <div className={`h-full ${barColor(value)}`} style={{ width: `${value}%` }} />
+      </div>
+      <span className={`w-7 text-right font-bold ${scoreColor(value)}`}>{value}</span>
+    </div>
+  )
+}
+
+function Chips({ items }: { items: string[] }) {
+  if (!items.length)
+    return <span className="text-xs text-slate-400">none detected</span>
+  return (
+    <div className="flex flex-wrap gap-1.5">
+      {items.map((t, i) => (
+        <span
+          key={i}
+          className="text-xs bg-slate-100 text-slate-600 rounded-full px-2 py-0.5"
+        >
+          {t}
+        </span>
+      ))}
     </div>
   )
 }
@@ -602,7 +660,28 @@ function Results({
           score={delivery.score}
           focus={coach.weakestLayer === 'Delivery'}
           delta={dDelta}
-          detail={`${delivery.wpm} wpm · ${delivery.fillerCount} fillers · variety ${delivery.subScores.variety}/100 · ${delivery.pauseCount} pauses`}
+          detail={`${delivery.wpm} wpm · ${delivery.fillerCount} fillers · variety ${delivery.subScores.variety}/100`}
+          details={
+            <div className="space-y-2">
+              <SubBar label="Pace" value={delivery.subScores.pace} />
+              <SubBar label="Fluency" value={delivery.subScores.fillers} />
+              <SubBar label="Variety" value={delivery.subScores.variety} />
+              <div className="text-xs text-slate-500 pt-1">
+                <div className="mb-1">
+                  Filler words:{' '}
+                  <Chips
+                    items={delivery.fillerBreakdown.map((f) => `${f.label} ×${f.n}`)}
+                  />
+                </div>
+                <div className="grid grid-cols-2 gap-x-3 gap-y-0.5 mt-1">
+                  <span>Pace: {delivery.wpm} wpm <span className="text-slate-400">(110–160)</span></span>
+                  <span>Pitch range: {delivery.pitchVariation.toFixed(1)} st <span className="text-slate-400">(&gt;2.5 lively)</span></span>
+                  <span>Pauses: {delivery.pauseCount}</span>
+                  <span>Talk time: {Math.round(delivery.speakingRatio * 100)}%</span>
+                </div>
+              </div>
+            </div>
+          }
         />
         <LayerScore
           name="Arrangement"
@@ -611,9 +690,15 @@ function Results({
           delta={aDelta}
           detail={`${arrangement.structure} · hook ${
             arrangement.hasHook ? '✓' : '✗'
-          } · close ${arrangement.hasClose ? '✓' : '✗'} · signposting ${
-            arrangement.signposting
-          }`}
+          } · close ${arrangement.hasClose ? '✓' : '✗'}`}
+          details={
+            <div className="text-xs text-slate-500 space-y-1">
+              <div>Structure: <b>{arrangement.structure}</b></div>
+              <div>Hook: {arrangement.hasHook ? '✓ yes' : '✗ missing'} · Close: {arrangement.hasClose ? '✓ yes' : '✗ missing'}</div>
+              <div>Signposting: {arrangement.signposting}</div>
+              <div className="italic pt-1">"{arrangement.evidence}"</div>
+            </div>
+          }
         />
         <LayerScore
           name="Style"
@@ -621,6 +706,17 @@ function Results({
           focus={coach.weakestLayer === 'Style'}
           delta={sDelta}
           detail={`~${style.avgSentenceLen} w/sentence · ${style.jargonCount} jargon · concrete ${style.concreteness}/100`}
+          details={
+            <div className="space-y-2">
+              <SubBar label="Concision" value={style.subScores.concision} />
+              <SubBar label="Jargon" value={style.subScores.jargon} />
+              <SubBar label="Concreteness" value={style.subScores.concreteness} />
+              <div className="text-xs text-slate-500 pt-1">
+                <div className="mb-1">Jargon used: <Chips items={style.jargonWords} /></div>
+                <div>~{style.avgSentenceLen} words/sentence · {style.vagueCount} vague words</div>
+              </div>
+            </div>
+          }
         />
       </div>
 
