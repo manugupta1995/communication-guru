@@ -4,6 +4,7 @@ import { useRecorder } from './lib/useRecorder'
 import { analyzeDelivery, computeDeliveryFromText } from './lib/delivery'
 import { scoreArrangement } from './lib/arrangement'
 import { scoreStyle } from './lib/style'
+import { scoreInvention } from './lib/invention'
 import { buildCoachCard } from './lib/coach'
 import { SAMPLE_AUDIO, SAMPLE_TRANSCRIPT } from './lib/sample'
 import {
@@ -70,13 +71,15 @@ export default function App() {
       const delivery = await deliveryPromise
       const arrangement = scoreArrangement(transcript, situation, question)
       const style = scoreStyle(transcript)
-      const coach = buildCoachCard(delivery, arrangement, style)
+      const invention = scoreInvention(transcript)
+      const coach = buildCoachCard(delivery, arrangement, style, invention)
       const session: SessionResult = {
         situation,
         transcript,
         delivery,
         arrangement,
         style,
+        invention,
         coach,
       }
       setPrev(result)
@@ -294,10 +297,11 @@ function Dashboard({
         <Stat label="Best score" value={String(progress.bestScore)} />
       </div>
 
-      <div className="grid gap-3 sm:grid-cols-3">
+      <div className="grid gap-3 grid-cols-2 sm:grid-cols-4">
         <TrendCard name="Delivery" data={progress.delivery} />
         <TrendCard name="Arrangement" data={progress.arrangement} />
         <TrendCard name="Style" data={progress.style} />
+        <TrendCard name="Invention" data={progress.invention} />
       </div>
 
       {progress.focusLayer && (
@@ -328,6 +332,7 @@ function Dashboard({
                 <span className={scoreColor(s.deliveryScore)}>D {s.deliveryScore}</span>
                 <span className={scoreColor(s.arrangementScore)}>A {s.arrangementScore}</span>
                 <span className={scoreColor(s.styleScore)}>S {s.styleScore}</span>
+                <span className={scoreColor(s.inventionScore ?? 0)}>I {s.inventionScore ?? 0}</span>
               </div>
             </li>
           ))}
@@ -646,15 +651,16 @@ function Results({
   onAgain: () => void
   onHome: () => void
 }) {
-  const { delivery, arrangement, style, coach } = result
+  const { delivery, arrangement, style, invention, coach } = result
   const dDelta = prev ? delivery.score - prev.delivery.score : undefined
   const aDelta = prev ? arrangement.score - prev.arrangement.score : undefined
   const sDelta = prev ? style.score - prev.style.score : undefined
+  const iDelta = prev ? invention.score - prev.invention.score : undefined
   const [shareUrl, setShareUrl] = useState<string | null>(null)
 
   return (
     <div className="space-y-5">
-      <div className="grid gap-3 sm:grid-cols-3">
+      <div className="grid gap-3 grid-cols-2 sm:grid-cols-4">
         <LayerScore
           name="Delivery"
           score={delivery.score}
@@ -714,6 +720,24 @@ function Results({
               <div className="text-xs text-slate-500 pt-1">
                 <div className="mb-1">Jargon used: <Chips items={style.jargonWords} /></div>
                 <div>~{style.avgSentenceLen} words/sentence · {style.vagueCount} vague words</div>
+              </div>
+            </div>
+          }
+        />
+        <LayerScore
+          name="Invention"
+          score={invention.score}
+          focus={coach.weakestLayer === 'Invention'}
+          delta={iDelta}
+          detail={`${invention.quantCount} specifics · ${invention.impactCount} outcomes · ${invention.hasThesis ? 'has point' : 'no point'}`}
+          details={
+            <div className="space-y-2">
+              <SubBar label="Evidence" value={invention.subScores.evidence} />
+              <SubBar label="Specificity" value={invention.subScores.specificity} />
+              <SubBar label="Clear point" value={invention.subScores.point} />
+              <div className="text-xs text-slate-500 pt-1">
+                <div className="mb-1">Generic phrases: <Chips items={invention.genericWords} /></div>
+                <div>{invention.quantCount} hard facts · {invention.impactCount} concrete outcomes</div>
               </div>
             </div>
           }

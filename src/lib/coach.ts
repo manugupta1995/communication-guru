@@ -2,6 +2,7 @@ import type {
   ArrangementResult,
   CoachCard,
   DeliveryMetrics,
+  InventionResult,
   StyleResult,
 } from '../types'
 
@@ -77,6 +78,24 @@ const INTRO_TECHNIQUES = {
 
 const INTRO_STRUCTURES = ['present-past-future', 'partial arc', 'flat intro']
 
+const INVENTION_TECHNIQUES = {
+  evidence: {
+    technique: 'Show, Don\'t Claim',
+    why: 'Anyone can say "I\'m results-driven." Specific evidence — numbers, named outcomes — is what makes a claim believable and memorable.',
+    drill: 'Re-record and attach one hard number to your biggest claim: not "I grew the product" but "I grew it from 5k to 200k users in a year".',
+  },
+  generic: {
+    technique: 'Cut The Generic',
+    why: 'Phrases like "various things", "I handle stuff", "I hit my targets" say nothing — they\'re interchangeable with any candidate. Substance is specific.',
+    drill: 'Re-record and replace every generic phrase with the actual thing: not "I work with data" but "I built the dashboard the sales team uses daily".',
+  },
+  point: {
+    technique: 'Lead With A Real Point',
+    why: 'Describing your job title isn\'t an argument. A sharp thesis — what you uniquely do and why it matters — gives the listener something to remember.',
+    drill: 'Re-record opening with a one-line value claim: "I\'m a <role> who <does the specific valuable thing nobody else does>." Then prove it.',
+  },
+} satisfies Record<string, Technique>
+
 const STYLE_TECHNIQUES = {
   concision: {
     technique: 'One Idea Per Sentence',
@@ -99,19 +118,35 @@ export function buildCoachCard(
   delivery: DeliveryMetrics,
   arrangement: ArrangementResult,
   style: StyleResult,
+  invention: InventionResult,
 ): CoachCard {
   // Pick the single weakest layer across the whole stack.
   const layers: { layer: CoachCard['weakestLayer']; score: number }[] = [
     { layer: 'Delivery', score: delivery.score },
     { layer: 'Arrangement', score: arrangement.score },
     { layer: 'Style', score: style.score },
+    { layer: 'Invention', score: invention.score },
   ]
   const weakest = layers.reduce((a, b) => (b.score < a.score ? b : a)).layer
 
   let t: Technique
   let evidence: string
 
-  if (weakest === 'Style') {
+  if (weakest === 'Invention') {
+    const { evidence: ev, specificity, point } = invention.subScores
+    const lowest = Math.min(ev, specificity, point)
+    if (lowest === point && !invention.hasThesis) {
+      t = INVENTION_TECHNIQUES.point
+      evidence = 'You described your role but never made a real point — there was no clear "here\'s what I uniquely do".'
+    } else if (lowest === specificity && invention.genericCount > 0) {
+      t = INVENTION_TECHNIQUES.generic
+      const top = invention.genericWords.slice(0, 3).join('", "')
+      evidence = `Generic phrasing${top ? ` ("${top}")` : ''} — ${invention.genericCount} say-nothing phrase${invention.genericCount === 1 ? '' : 's'} that could describe anyone.`
+    } else {
+      t = INVENTION_TECHNIQUES.evidence
+      evidence = `Only ${invention.quantCount} specific fact${invention.quantCount === 1 ? '' : 's'} and ${invention.impactCount} concrete outcome${invention.impactCount === 1 ? '' : 's'} — the claims aren't backed by evidence.`
+    }
+  } else if (weakest === 'Style') {
     const { concision, jargon, concreteness } = style.subScores
     const lowest = Math.min(concision, jargon, concreteness)
     if (lowest === jargon) {
@@ -170,6 +205,7 @@ export function buildCoachCard(
       Delivery: 'Your content held up — fix this one delivery habit and the whole answer levels up.',
       Arrangement: 'Your delivery is solid — tighten the structure and this becomes a genuinely strong answer.',
       Style: 'The bones are good — sharpen the language and this lands much harder.',
+      Invention: 'You deliver well — now add real substance and this goes from polished to compelling.',
     }[weakest],
   }
 }

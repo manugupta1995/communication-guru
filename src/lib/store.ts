@@ -10,7 +10,7 @@ const PRO_KEY = 'guru.pro.v1'
 
 export const FREE_SESSION_LIMIT = 3
 
-export type Layer = 'Delivery' | 'Arrangement' | 'Style'
+export type Layer = 'Delivery' | 'Arrangement' | 'Style' | 'Invention'
 
 export interface StoredSession {
   id: string
@@ -19,6 +19,7 @@ export interface StoredSession {
   deliveryScore: number
   arrangementScore: number
   styleScore: number
+  inventionScore: number
   weakestLayer: Layer
   technique: string
   wpm: number
@@ -33,6 +34,7 @@ export function toStored(prompt: string, r: SessionResult): StoredSession {
     deliveryScore: r.delivery.score,
     arrangementScore: r.arrangement.score,
     styleScore: r.style.score,
+    inventionScore: r.invention.score,
     weakestLayer: r.coach.weakestLayer,
     technique: r.coach.technique,
     wpm: r.delivery.wpm,
@@ -90,6 +92,7 @@ export interface Progress {
   delivery: LayerProgress
   arrangement: LayerProgress
   style: LayerProgress
+  invention: LayerProgress
   focusLayer: Layer | null
   focusCount: number
   bestScore: number
@@ -121,13 +124,13 @@ export function computeProgress(sessions: StoredSession[]): Progress {
     delta: (arr.at(-1) ?? 0) - (arr[0] ?? 0),
     series: arr.slice(-12),
   })
-  const counts: Record<Layer, number> = { Delivery: 0, Arrangement: 0, Style: 0 }
+  const counts: Record<Layer, number> = { Delivery: 0, Arrangement: 0, Style: 0, Invention: 0 }
   for (const s of sessions) counts[s.weakestLayer]++
   // The layer that has been weakest most often is the user's recurring focus.
   const focusLayer =
     sessions.length === 0
       ? null
-      : (['Delivery', 'Arrangement', 'Style'] as Layer[]).reduce((a, b) =>
+      : (['Delivery', 'Arrangement', 'Style', 'Invention'] as Layer[]).reduce((a, b) =>
           counts[b] > counts[a] ? b : a,
         )
   return {
@@ -136,10 +139,11 @@ export function computeProgress(sessions: StoredSession[]): Progress {
     delivery: layer(sessions.map((s) => s.deliveryScore)),
     arrangement: layer(sessions.map((s) => s.arrangementScore)),
     style: layer(sessions.map((s) => s.styleScore)),
+    invention: layer(sessions.map((s) => s.inventionScore ?? 0)),
     focusLayer,
     focusCount: focusLayer ? counts[focusLayer] : 0,
     bestScore: sessions.reduce(
-      (m, s) => Math.max(m, s.deliveryScore, s.arrangementScore, s.styleScore),
+      (m, s) => Math.max(m, s.deliveryScore, s.arrangementScore, s.styleScore, s.inventionScore ?? 0),
       0,
     ),
   }

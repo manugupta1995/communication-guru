@@ -4,10 +4,10 @@ import type { SessionResult } from '../types'
 // (no dependency, no backend) the user can post, plus a caption to copy.
 
 export function buildCaption(r: SessionResult): string {
-  const { delivery, arrangement, style, coach } = r
+  const { delivery, arrangement, style, invention, coach } = r
   return [
     `🎤 My Communication Guru scorecard`,
-    `Delivery ${delivery.score} · Arrangement ${arrangement.score} · Style ${style.score}`,
+    `Delivery ${delivery.score} · Arrangement ${arrangement.score} · Style ${style.score} · Invention ${invention.score}`,
     `Working on: ${coach.technique}`,
     `Coach yourself free →`,
   ].join('\n')
@@ -43,28 +43,29 @@ export function drawScorecard(r: SessionResult): string {
   ctx.font = '400 24px system-ui, sans-serif'
   ctx.fillText('My speaking scorecard', 62, 138)
 
-  // Three layer scores.
+  // Four layer scores.
   const layers: [string, number][] = [
     ['Delivery', r.delivery.score],
     ['Arrangement', r.arrangement.score],
     ['Style', r.style.score],
+    ['Invention', r.invention.score],
   ]
-  const cardW = 210
-  const gap = 25
+  const gap = 18
   const startX = 60
+  const cardW = (W - startX * 2 - gap * (layers.length - 1)) / layers.length
   const y = 220
   layers.forEach(([name, score], i) => {
     const x = startX + i * (cardW + gap)
     ctx.fillStyle = '#ffffff'
-    roundRect(ctx, x, y, cardW, 200, 20)
+    roundRect(ctx, x, y, cardW, 200, 18)
     ctx.fill()
     ctx.fillStyle = color(score)
-    ctx.font = '800 72px system-ui, sans-serif'
+    ctx.font = '800 60px system-ui, sans-serif'
     ctx.textAlign = 'center'
-    ctx.fillText(String(score), x + cardW / 2, y + 110)
+    ctx.fillText(String(score), x + cardW / 2, y + 105)
     ctx.fillStyle = '#475569'
-    ctx.font = '600 22px system-ui, sans-serif'
-    ctx.fillText(name, x + cardW / 2, y + 155)
+    ctx.font = '600 17px system-ui, sans-serif'
+    ctx.fillText(name, x + cardW / 2, y + 150)
   })
 
   // Coach focus.

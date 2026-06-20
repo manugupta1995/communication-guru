@@ -43,6 +43,21 @@ export interface StyleResult {
   }
 }
 
+// Invention canon — substance/specificity/evidence, computed in-browser.
+export interface InventionResult {
+  score: number
+  quantCount: number // quantified facts (numbers, %, magnitudes)
+  impactCount: number // outcome verbs (grew/cut/launched…)
+  genericCount: number
+  genericWords: string[]
+  hasThesis: boolean
+  subScores: {
+    evidence: number
+    specificity: number
+    point: number
+  }
+}
+
 // Judged by Claude on the server.
 export interface ArrangementResult {
   score: number // 0..100
@@ -56,7 +71,7 @@ export interface ArrangementResult {
 }
 
 export interface CoachCard {
-  weakestLayer: 'Delivery' | 'Arrangement' | 'Style'
+  weakestLayer: 'Delivery' | 'Arrangement' | 'Style' | 'Invention'
   technique: string
   why: string
   drill: string
@@ -70,5 +85,6 @@ export interface SessionResult {
   delivery: DeliveryMetrics
   arrangement: ArrangementResult
   style: StyleResult
+  invention: InventionResult
   coach: CoachCard
 }
