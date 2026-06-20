@@ -21,6 +21,7 @@ export function useRecorder() {
   const [error, setError] = useState<string | null>(null)
 
   const mediaRef = useRef<MediaRecorder | null>(null)
+  const mimeRef = useRef<string>('audio/webm')
   const chunksRef = useRef<Blob[]>([])
   const recognitionRef = useRef<any>(null)
   const finalTextRef = useRef('')
@@ -43,7 +44,7 @@ export function useRecorder() {
           recognitionRef.current?.stop()
         } catch {}
         resolve({
-          blob: new Blob(chunksRef.current, { type: 'audio/webm' }),
+          blob: new Blob(chunksRef.current, { type: mimeRef.current }),
           transcript: finalTextRef.current.trim(),
         })
         return
@@ -51,7 +52,7 @@ export function useRecorder() {
       setStatus('processing')
       resolveRef.current = resolve
       rec.onstop = () => {
-        const blob = new Blob(chunksRef.current, { type: 'audio/webm' })
+        const blob = new Blob(chunksRef.current, { type: mimeRef.current })
         rec.stream.getTracks().forEach((t) => t.stop())
         try {
           recognitionRef.current?.stop()
@@ -82,6 +83,8 @@ export function useRecorder() {
 
     const rec = new MediaRecorder(stream)
     mediaRef.current = rec
+    // Safari produces mp4/aac, Chrome/Firefox webm/opus — use the real type.
+    mimeRef.current = rec.mimeType || 'audio/webm'
     rec.ondataavailable = (e) => {
       if (e.data.size > 0) chunksRef.current.push(e.data)
     }

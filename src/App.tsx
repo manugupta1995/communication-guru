@@ -5,6 +5,7 @@ import { analyzeDelivery, computeDeliveryFromText } from './lib/delivery'
 import { scoreArrangement } from './lib/arrangement'
 import { scoreStyle } from './lib/style'
 import { scoreInvention } from './lib/invention'
+import { transcribeBlob, preloadWhisper } from './lib/whisper'
 import { buildCoachCard } from './lib/coach'
 import { SAMPLE_AUDIO, SAMPLE_TRANSCRIPT } from './lib/sample'
 import {
@@ -45,6 +46,8 @@ export default function App() {
   const [result, setResult] = useState<SessionResult | null>(null)
   const [prev, setPrev] = useState<SessionResult | null>(null)
   const [analyzing, setAnalyzing] = useState(false)
+  const [transcribing, setTranscribing] = useState(false)
+  const [busyMsg, setBusyMsg] = useState<string | null>(null)
   const [pro, setProState] = useState(false)
   const [showUpgrade, setShowUpgrade] = useState(false)
   const rec = useRecorder()
@@ -55,6 +58,12 @@ export default function App() {
     setProState(isPro())
     setStep(s.length > 0 ? 'home' : 'setup')
   }, [])
+
+  // Warm the on-device Whisper model while the user is on the record screen,
+  // so the first transcription isn't slowed by the one-time download.
+  useEffect(() => {
+    if (step === 'record') preloadWhisper()
+  }, [step])
 
   const progress: Progress = computeProgress(sessions)
   const left = sessionsLeft(sessions.length)
@@ -92,13 +101,37 @@ export default function App() {
   }
 
   async function handleStop() {
-    const { blob, transcript } = await rec.stop()
-    const text = transcript || SAMPLE_TRANSCRIPT
-    const deliveryPromise =
-      blob.size > 0 && transcript
-        ? analyzeDelivery(blob, text)
-        : Promise.resolve(computeDeliveryFromText(text, SAMPLE_AUDIO))
-    await runAnalysis(text, deliveryPromise)
+    const { blob, transcript: live } = await rec.stop()
+    let text = live
+    // On-device Whisper: works in every browser AND captures "um"/"uh".
+    if (blob.size > 0) {
+      try {
+        setTranscribing(true)
+        setBusyMsg('Preparing on-device transcription…')
+        const whisperText = await transcribeBlob(blob, (pct, label) =>
+          setBusyMsg(
+            pct < 100
+              ? `Downloading speech model (one-time)… ${pct}%`
+              : `Transcribing “${label}”…`,
+          ),
+        )
+        if (whisperText) text = whisperText
+      } catch {
+        // Fall back to the live (Chrome) transcript, or the sample below.
+      } finally {
+        setTranscribing(false)
+        setBusyMsg(null)
+      }
+    }
+    if (blob.size > 0 && text) {
+      await runAnalysis(text, analyzeDelivery(blob, text))
+    } else {
+      // No usable audio/transcript — show the sample so the loop still works.
+      await runAnalysis(
+        SAMPLE_TRANSCRIPT,
+        Promise.resolve(computeDeliveryFromText(SAMPLE_TRANSCRIPT, SAMPLE_AUDIO)),
+      )
+    }
   }
 
   function handleSample() {
@@ -180,7 +213,8 @@ export default function App() {
           transcript={rec.transcript}
           elapsed={rec.elapsed}
           error={rec.error}
-          analyzing={analyzing}
+          analyzing={analyzing || transcribing}
+          busyMsg={busyMsg}
           onStart={() => void rec.start()}
           onStop={() => void handleStop()}
           onSample={handleSample}
@@ -457,6 +491,7 @@ function RecordPanel({
   elapsed,
   error,
   analyzing,
+  busyMsg,
   onStart,
   onStop,
   onSample,
@@ -468,6 +503,7 @@ function RecordPanel({
   elapsed: number
   error: string | null
   analyzing: boolean
+  busyMsg: string | null
   onStart: () => void
   onStop: () => void
   onSample: () => void
@@ -489,10 +525,10 @@ function RecordPanel({
       {analyzing ? (
         <div className="text-center py-8">
           <div className="text-guru font-semibold animate-pulse">
-            Analyzing your answer…
+            {busyMsg || 'Analyzing your answer…'}
           </div>
           <p className="text-sm text-slate-400 mt-1">
-            Scoring Delivery + Arrangement — all in your browser
+            Transcription + scoring — 100% on your device, nothing uploaded
           </p>
         </div>
       ) : (
@@ -544,9 +580,9 @@ function RecordPanel({
             </p>
           </div>
           <p className="text-xs text-slate-400 mt-2">
-            Tip: use Chrome or Edge for live transcription. Pitch, pace & energy
-            are measured from your actual audio; exact "um"/"uh" counts depend on
-            the browser transcriber.
+            Works in any browser. After you stop, an on-device speech model
+            (~40MB, downloads once) transcribes your answer — including filler
+            words — privately on your device. Nothing is uploaded.
           </p>
         </>
       )}
